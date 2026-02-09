@@ -4,7 +4,7 @@ Vite plugin to bundle assets into DotNetNuke (DNN) .ascx skin files and generate
 ```js
 // vite.config.ts
 import { defineConfig } from "vite";
-import dnnAscx from "@violetrose/vite-dnn-ascx";
+import dnnAscx from "@violetrose/vite-plugin-dnn-ascx";
 
 const skinPublicBase = `/Portals/_default/Skins/MySkin/`;
 
