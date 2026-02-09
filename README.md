@@ -51,7 +51,7 @@ For development, run `vite` and it should create a `.dnn` folder with your devel
 Then, create a symlink in your DNN installation to this skin (the name can be anything as files are loaded from the vite dev server and not from the DNN Skin):
 
 ```
-symlink /d "C:\<path-to-dnn>\Portals\_default\Skins\MySkinDev" "C:\<path-to-skin-project>\.dnn"
+mklink /d "C:\<path-to-dnn>\Portals\_default\Skins\MySkinDev" "C:\<path-to-skin-project>\.dnn"
 ```
 
 Lastly, add permissions to the `.dnn` folder for your IIS AppPool as you would for your DNN installation folder (i.e. `IIS AppPool\ApplicationName`, `Network Service`, `IUSR`).
