@@ -1,0 +1,45 @@
+{
+  "name": "vite-plugin-dnn-ascx",
+  "version": "0.1.0",
+  "description": "Vite plugin to inject hashed assets into DotNetNuke (DNN) .ascx skin files and generate dev-ready skins.",
+  "license": "MIT",
+  "author": "Violet Rosenzweig",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/6TELOIV/vite-plugin-dnn-ascx.git"
+  },
+  "bugs": {
+    "url": "https://github.com/6TELOIV/vite-plugin-dnn-ascx/issues"
+  },
+  "keywords": ["vite", "vite-plugin", "dnn", "dotnetnuke", "ascx"],
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": ["dist", "README.md", "LICENSE"],
+  "scripts": {
+    "build": "vite build && tsc -p tsconfig.build.json",
+    "dev": "vite build --watch",
+    "lint": "eslint .",
+    "typecheck": "tsc -p tsconfig.build.json --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "peerDependencies": {
+    "vite": ">=5.0.0"
+  },
+  "dependencies": {
+    "fast-glob": "3.3.3"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3",
+    "vite": "7.2.4",
+    "@types/node": "^22.0.0"
+  }
+}
