@@ -1,5 +1,5 @@
 {
-  "name": "vite-plugin-dnn-ascx",
+  "name": "@violetrose/vite-plugin-dnn-ascx",
   "version": "0.1.0",
   "description": "Vite plugin to inject hashed assets into DotNetNuke (DNN) .ascx skin files and generate dev-ready skins.",
   "license": "MIT",
