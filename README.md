@@ -24,7 +24,8 @@ export default defineConfig(({ command }) => ({
 
 ```html
 <!-- home.ascx -->
-
+ 
+<%@ Control Language="C#" AutoEventWireup="true" Explicit="True" Inherits="DotNetNuke.UI.Skins.Skin" %>
 <!-- @vite:entry src/home.js -->
 <button id="counter" type="button">Counter: 0</button>
 ```
@@ -35,7 +36,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let counter = 0;
   const counterButton = document.getElementById("counter");
 
-  counterButton.on("click", () => {
+  counterButton.addEventListener("click", () => {
     counter += 1;
     counterButton.textContent = `Counter: ${counter}`;
   })
