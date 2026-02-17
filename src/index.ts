@@ -239,9 +239,9 @@ export type DnnAscxPluginOptions = {
  * ```ts
  * import { defineConfig } from "vite";
  * import dnnAscx from "@violetrose/vite-dnn-ascx";
- * 
+ *
  * const skinPublicBase = `/Portals/_default/Skins/MySkin/`;
- * 
+ *
  * export default defineConfig(({ command }) => ({
  *   base: command === "serve" ? "/" : skinPublicBase,
  *   server: {
@@ -256,10 +256,11 @@ export type DnnAscxPluginOptions = {
  * }));
  * ```
  */
-export default function dnnAscx(
-  opts: DnnAscxPluginOptions
-): Plugin {
+export default function dnnAscx(opts: DnnAscxPluginOptions): Plugin {
   let config: ResolvedConfig;
+  let buildOutDir: string;
+  let devOutDir: string;
+  let prodOutDir: string | undefined;
 
   const marker = opts.marker ?? /<!--\s*@vite:entry\s+([^\s]+)\s*-->/g;
 
@@ -269,15 +270,19 @@ export default function dnnAscx(
   const ascxRootDir = path.resolve(opts.ascxRootDir ?? process.cwd());
 
   function norm(p: string) {
-    return p.replace(/\\/g, "/").replace(/\/+$/, "");
+    return p.replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
   }
-  
+
+  function absPath(p: string) {
+    return norm(path.isAbsolute(p) ? p : path.resolve(p))
+  }
+
   function dirToIgnore(dir?: string) {
     if (!dir) return [];
     const d = norm(dir);
     return [d, `${d}/**`];
   }
-  
+
   function uniq(arr: string[]) {
     return Array.from(new Set(arr));
   }
@@ -290,7 +295,10 @@ export default function dnnAscx(
   ): OutputChunk | undefined {
     for (const item of Object.values(bundle)) {
       if (item.type === "chunk" && item.isEntry) {
-        if (item.facadeModuleId && path.resolve(item.facadeModuleId) === entryAbs) {
+        if (
+          item.facadeModuleId &&
+          path.resolve(item.facadeModuleId) === entryAbs
+        ) {
           return item;
         }
       }
@@ -311,7 +319,11 @@ export default function dnnAscx(
     return `http://localhost:${port}`;
   }
 
-  function writeMirrored(outDir: string, absFilePath: string, contents: string) {
+  function writeMirrored(
+    outDir: string,
+    absFilePath: string,
+    contents: string
+  ) {
     const rel = path.relative(ascxRootDir, absFilePath);
     const safeRel = rel.startsWith("..") ? path.basename(absFilePath) : rel;
     const outPath = path.join(outDir, safeRel);
@@ -324,14 +336,19 @@ export default function dnnAscx(
     if (ctx.mode === "dev" && ctx.devClientUrl) {
       tags.push(`<script type="module" src="${ctx.devClientUrl}"></script>`);
     }
-    for (const css of ctx.cssUrls) tags.push(`<link rel="stylesheet" href="${css}">`);
+    for (const css of ctx.cssUrls)
+      tags.push(`<link rel="stylesheet" href="${css}">`);
     tags.push(`<script type="module" src="${ctx.jsUrl}"></script>`);
     return tags.join("\n");
   };
 
   const render = opts.render ?? defaultRender;
 
-  function rewriteAscxForDev(original: string, ascxAbs: string, devOrigin: string): string {
+  function rewriteAscxForDev(
+    original: string,
+    ascxAbs: string,
+    devOrigin: string
+  ): string {
     marker.lastIndex = 0;
     if (!marker.test(original)) return original;
     marker.lastIndex = 0;
@@ -377,9 +394,9 @@ export default function dnnAscx(
     enforce: "post",
 
     async config(userConfig, env) {
-      const buildOutDir = userConfig.build?.outDir ?? "dist";
-      const devOutDir = opts.devOutAscxDir ?? ".dnn";
-      const prodOutDir = opts.outAscxDir; // may be undefined; that's fine
+      buildOutDir = userConfig.build?.outDir ?? "dist";
+      devOutDir = opts.devOutAscxDir ?? ".dnn";
+      prodOutDir = opts.outAscxDir; // may be undefined; that's fine
 
       ignore = uniq([
         // Always ignore vite build output
@@ -397,43 +414,58 @@ export default function dnnAscx(
       ]);
 
       // Always discover ascx files (dev needs them too)
-      allAscxFiles = await fg(opts.ascxGlobs, {
-        absolute: true,
-        ignore,
-        dot: true,
-        followSymbolicLinks: false,
-      });
+      allAscxFiles = (
+        await fg(opts.ascxGlobs, {
+          absolute: true,
+          ignore,
+          dot: true,
+          followSymbolicLinks: false,
+        })
+      ).map(norm);
+
+      // Only set watcher ignore on serve
+      if (env.command === "serve") {
+        return {
+          server: {
+            watch: {
+              ignored: ignore,
+            },
+          },
+        };
+      }
 
       // Only compute Rollup inputs for build
-      if (env.command !== "build") return;
+      if (env.command === "build") {
+        const inputs: Record<string, string> = {};
+        refs.length = 0;
 
-      const inputs: Record<string, string> = {};
-      refs.length = 0;
+        for (const fAbs of allAscxFiles) {
+          const content = fs.readFileSync(fAbs, "utf8");
+          marker.lastIndex = 0;
 
-      for (const fAbs of allAscxFiles) {
-        const content = fs.readFileSync(fAbs, "utf8");
-        marker.lastIndex = 0;
-
-        let m: RegExpExecArray | null;
-        while ((m = marker.exec(content))) {
-          const entryAbs = path.resolve(m[1]);
-          const key = path.relative(process.cwd(), entryAbs).replace(/[^\w]/g, "_");
-          inputs[key] = entryAbs;
-          refs.push({ ascxPath: fAbs, entryAbs });
+          let m: RegExpExecArray | null;
+          while ((m = marker.exec(content))) {
+            const entryAbs = path.resolve(m[1]);
+            const key = path
+              .relative(process.cwd(), entryAbs)
+              .replace(/[^\w]/g, "_");
+            inputs[key] = entryAbs;
+            refs.push({ ascxPath: fAbs, entryAbs });
+          }
         }
+
+        if (opts.requireAtLeastOneEntry && Object.keys(inputs).length === 0) {
+          throw new Error("No @vite:entry markers found in ascx files.");
+        }
+
+        if (Object.keys(inputs).length === 0) return;
+
+        return {
+          build: {
+            rollupOptions: { input: inputs },
+          },
+        };
       }
-
-      if (opts.requireAtLeastOneEntry && Object.keys(inputs).length === 0) {
-        throw new Error("No @vite:entry markers found in ascx files.");
-      }
-
-      if (Object.keys(inputs).length === 0) return;
-
-      return {
-        build: {
-          rollupOptions: { input: inputs },
-        },
-      };
     },
 
     configResolved(resolved) {
@@ -441,35 +473,57 @@ export default function dnnAscx(
     },
 
     configureServer(server) {
+      const reload = () => server.ws.send({ type: 'full-reload', path: '*' });
+
       writeAllDevAscx(server);
 
       const watcher = server.watcher;
 
+      // watch all ascx files
+      watcher.add("**/*.ascx");
+
       const onChange = (file: string) => {
-        if (!file.toLowerCase().endsWith(".ascx")) return;
-        const abs = path.isAbsolute(file) ? file : path.resolve(file);
-        if (!allAscxFiles.includes(abs)) return;
+        const abs = absPath(file.toLowerCase());
+        const absPublicDir = absPath(config.publicDir.toLowerCase() ?? "public");
+        // public folder is simply copied over
+        if (abs.startsWith(absPublicDir)){
+          const original = fs.readFileSync(abs, "utf8");
+          const dirWithoutPublicDir = absPath(abs.replace(absPublicDir, ''));
+          writeMirrored(absPath(devOutDir), dirWithoutPublicDir, original);
+          reload();
+        } else if (abs.endsWith(".ascx")) {
+          // ignore changes to non-included files.
+          if (!allAscxFiles.includes(abs)) return;
 
-        const devOutAbs = path.resolve(opts.devOutAscxDir ?? ".dnn");
-        const devOrigin = computeDevOrigin(server);
+          const devOrigin = computeDevOrigin(server);
 
-        const original = fs.readFileSync(abs, "utf8");
-        const rewritten = rewriteAscxForDev(original, abs, devOrigin);
-        writeMirrored(devOutAbs, abs, rewritten);
+          const original = fs.readFileSync(abs, "utf8");
+          const rewritten = rewriteAscxForDev(original, abs, devOrigin);
+          writeMirrored(absPath(devOutDir), abs, rewritten);
+          reload();
+        }
       };
 
       watcher.on("change", onChange);
 
       watcher.on("add", (file) => {
-        if (!file.toLowerCase().endsWith(".ascx")) return;
-        allAscxFiles = fg.sync(opts.ascxGlobs, { absolute: true, ignore });
-        writeAllDevAscx(server);
+        if (file.toLowerCase().endsWith(".ascx")) {
+          allAscxFiles = fg
+            .sync(opts.ascxGlobs, { absolute: true, ignore })
+            .map(norm);
+          writeAllDevAscx(server);
+          reload();
+        }
       });
 
       watcher.on("unlink", (file) => {
-        if (!file.toLowerCase().endsWith(".ascx")) return;
-        allAscxFiles = fg.sync(opts.ascxGlobs, { absolute: true, ignore });
-        writeAllDevAscx(server);
+        if (file.toLowerCase().endsWith(".ascx")) {
+          allAscxFiles = fg
+            .sync(opts.ascxGlobs, { absolute: true, ignore })
+            .map(norm);
+          writeAllDevAscx(server);
+          reload();
+        }
       });
     },
 
@@ -491,29 +545,33 @@ export default function dnnAscx(
           continue;
         }
 
-        const rewritten = original.replace(marker, (_all, entryFromMarker: string) => {
-          const entryAbs = path.resolve(entryFromMarker);
-          const chunk = getChunkBySourceEntry(bundle, entryAbs);
-          if (!chunk) return `<!-- vite:missing-entry ${entryFromMarker} -->`;
+        const rewritten = original.replace(
+          marker,
+          (_all, entryFromMarker: string) => {
+            const entryAbs = path.resolve(entryFromMarker);
+            const chunk = getChunkBySourceEntry(bundle, entryAbs);
+            if (!chunk) return `<!-- vite:missing-entry ${entryFromMarker} -->`;
 
-          const jsUrl = toPublicUrl(chunk.fileName);
-          const cssUrls: string[] = [];
+            const jsUrl = toPublicUrl(chunk.fileName);
+            const cssUrls: string[] = [];
 
-          const md = (chunk as any).viteMetadata;
-          if (md?.importedCss) {
-            for (const c of md.importedCss as Set<string>) cssUrls.push(toPublicUrl(c));
+            const md = (chunk as any).viteMetadata;
+            if (md?.importedCss) {
+              for (const c of md.importedCss as Set<string>)
+                cssUrls.push(toPublicUrl(c));
+            }
+
+            return render({
+              mode: "build",
+              ascxPath: fAbs,
+              entryFromMarker,
+              entryAbs,
+              jsUrl,
+              cssUrls,
+              chunk,
+            });
           }
-
-          return render({
-            mode: "build",
-            ascxPath: fAbs,
-            entryFromMarker,
-            entryAbs,
-            jsUrl,
-            cssUrls,
-            chunk,
-          });
-        });
+        );
 
         writeMirrored(outDir, fAbs, rewritten);
       }
