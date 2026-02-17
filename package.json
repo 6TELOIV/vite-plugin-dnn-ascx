@@ -1,6 +1,6 @@
 {
   "name": "@violetrose/vite-plugin-dnn-ascx",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Vite plugin to inject hashed assets into DotNetNuke (DNN) .ascx skin files and generate dev-ready skins.",
   "license": "MIT",
   "author": "Violet Rosenzweig",
@@ -11,7 +11,13 @@
   "bugs": {
     "url": "https://github.com/6TELOIV/vite-plugin-dnn-ascx/issues"
   },
-  "keywords": ["vite", "vite-plugin", "dnn", "dotnetnuke", "ascx"],
+  "keywords": [
+    "vite",
+    "vite-plugin",
+    "dnn",
+    "dotnetnuke",
+    "ascx"
+  ],
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
@@ -23,7 +29,11 @@
       "require": "./dist/index.cjs"
     }
   },
-  "files": ["dist", "README.md", "LICENSE"],
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "vite build && tsc -p tsconfig.build.json",
     "dev": "vite build --watch",
