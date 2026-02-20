@@ -484,7 +484,7 @@ export default function dnnAscx(opts: DnnAscxPluginOptions): Plugin {
 
       const onChange = (file: string) => {
         const abs = absPath(file.toLowerCase());
-        const absPublicDir = absPath(config.publicDir.toLowerCase() ?? "public");
+        const absPublicDir = `${absPath(config.publicDir.toLowerCase() ?? "public")}/`;
         // public folder is simply copied over
         if (abs.startsWith(absPublicDir)){
           const original = fs.readFileSync(abs, "utf8");
